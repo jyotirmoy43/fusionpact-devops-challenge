@@ -2,6 +2,8 @@
 
 # Import local modules directly (no "app." prefix)
 import services
+import schema
+
 from schema import UserIn, BaseResponse, UserListOut
 
 app = FastAPI()
