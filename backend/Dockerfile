@@ -1,3 +1,4 @@
+
 FROM python:3.9-slim
 
 WORKDIR /app
@@ -9,7 +10,7 @@ COPY ./app ./app
 
 ENV PYTHONPATH=/app
 
-CMD ["python", "app/main.py"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "5000"]
 
 
 
