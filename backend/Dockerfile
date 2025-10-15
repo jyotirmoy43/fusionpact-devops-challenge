@@ -1,7 +1,20 @@
-FROM node:18
+FROM python:3.10-slim
+
+# Set working directory
 WORKDIR /app
-COPY package*.json ./
-RUN npm install
+
+# Copy dependency list
+COPY requirements.txt .
+
+# Install dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
 COPY . .
+
+# Expose the port your app runs on
 EXPOSE 5000
-CMD ["npm", "start"]
+
+# Command to run your app
+CMD ["python", "app/app.py"]
+
