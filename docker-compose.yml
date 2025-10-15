@@ -2,11 +2,11 @@
 services:
   backend:
     build: ./backend
-    command: python main.py
+    command: uvicorn app.main:app --host 0.0.0.0 --port 5000
     ports:
       - "5000:5000"
     volumes:
-      - backend_data:/app/app/data
+      - backend_data:/app/data
     networks:
       - app_network
     restart: unless-stopped
