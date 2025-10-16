@@ -1,139 +1,107 @@
 
-version: "3.9"
+version: '3.8'
 
 services:
-  # ===============================
-  # Backend (FastAPI)
-  # ===============================
+  ###############################################
+  # 🧠 BACKEND SERVICE
+  ###############################################
   backend:
-    build: ./backend
+    image: your-dockerhub-username/fusionpact-backend:${BUILD_NUMBER:-latest}
     container_name: backend
-    command: uvicorn app.main:app --host 0.0.0.0 --port 5000
+    restart: always
     ports:
-      - "5000:5000"
+      - "8080:8080"
     environment:
-      - ENV=production
-    volumes:
-      - backend_data:/app/data
+      - APP_ENV=production
     networks:
-      - app_network
       - monitoring
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health" ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    restart: unless-stopped
+      - app_net
 
-  # ===============================
-  # Frontend
-  # ===============================
+  ###############################################
+  # 🎨 FRONTEND SERVICE
+  ###############################################
   frontend:
-    build: ./frontend
+    image: your-dockerhub-username/fusionpact-frontend:${BUILD_NUMBER:-latest}
     container_name: frontend
+    restart: always
     ports:
-      - "80:80"
+      - "3000:3000"
     depends_on:
       - backend
+    environment:
+      - API_URL=http://backend:8080
     networks:
-      - app_network
-    restart: unless-stopped
+      - app_net
 
-  # ===============================
-  # Prometheus
-  # ===============================
+  ###############################################
+  # ⚙️ PROMETHEUS
+  ###############################################
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus
     container_name: prometheus
-    volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus_data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.enable-lifecycle'
+    restart: always
     ports:
       - "9090:9090"
-    networks:
-      - monitoring
-    restart: always
-
-  # ===============================
-  # Node Exporter
-  # ===============================
-  node-exporter:
-    image: prom/node-exporter:latest
-    container_name: node-exporter
-    ports:
-      - "9100:9100"
-    networks:
-      - monitoring
-    restart: always
-    command:
-      - '--path.rootfs=/host'
-    pid: "host"
     volumes:
-      - /:/host:ro,rslave
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - monitoring
+    depends_on:
+      - backend
+      - jenkins
 
-  # ===============================
-  # Grafana
-  # ===============================
+  ###############################################
+  # 📊 GRAFANA
+  ###############################################
   grafana:
-    image: grafana/grafana-oss:latest
+    image: grafana/grafana
     container_name: grafana
+    restart: always
+    ports:
+      - "3001:3000"
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_USERS_ALLOW_SIGN_UP=false
-    ports:
-      - "3000:3000"
     depends_on:
       - prometheus
     networks:
       - monitoring
-    restart: always
-    volumes:
-      - grafana_data:/var/lib/grafana
 
-  # ===============================
-  # Jenkins
-  # ===============================
+  ###############################################
+  # 🧱 NODE EXPORTER (SYSTEM METRICS)
+  ###############################################
+  node-exporter:
+    image: prom/node-exporter
+    container_name: node-exporter
+    restart: always
+    ports:
+      - "9100:9100"
+    networks:
+      - monitoring
+
+  ###############################################
+  # 🧰 JENKINS
+  ###############################################
   jenkins:
     image: jenkins/jenkins:lts
     container_name: jenkins
+    restart: always
     user: root
     ports:
-      - "8080:8080"
+      - "8081:8080"
       - "50000:50000"
     environment:
-      - JENKINS_OPTS=--httpPort=8080
+      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false
     volumes:
       - jenkins_data:/var/jenkins_home
       - /var/run/docker.sock:/var/run/docker.sock
-      - /usr/bin/docker:/usr/bin/docker
     networks:
       - monitoring
-    restart: always
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/login" ]
-      interval: 30s
-      timeout: 10s
-      retries: 5
 
-# ===============================
-# Volumes
-# ===============================
-volumes:
-  backend_data:
-  prometheus_data:
-  grafana_data:
-  jenkins_data:
-
-# ===============================
-# Networks
-# ===============================
 networks:
-  app_network:
-    driver: bridge
+  app_net:
   monitoring:
-    driver: bridge
+
+volumes:
+  jenkins_data:
