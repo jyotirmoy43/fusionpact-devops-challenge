@@ -1,107 +1,33 @@
-
 version: '3.8'
 
 services:
-  ###############################################
-  # 🧠 BACKEND SERVICE
-  ###############################################
-  backend:
-    image: your-dockerhub-username/fusionpact-backend:${BUILD_NUMBER:-latest}
-    container_name: backend
-    restart: always
-    ports:
-      - "8080:8080"
-    environment:
-      - APP_ENV=production
-    networks:
-      - monitoring
-      - app_net
-
-  ###############################################
-  # 🎨 FRONTEND SERVICE
-  ###############################################
   frontend:
-    image: your-dockerhub-username/fusionpact-frontend:${BUILD_NUMBER:-latest}
-    container_name: frontend
-    restart: always
+    image: jyotirmoy43/frontend:latest
     ports:
-      - "3000:3000"
-    depends_on:
-      - backend
-    environment:
-      - API_URL=http://backend:8080
-    networks:
-      - app_net
+      - "80:80"
+    restart: always
 
-  ###############################################
-  # ⚙️ PROMETHEUS
-  ###############################################
-  prometheus:
-    image: prom/prometheus
-    container_name: prometheus
-    restart: always
+  backend:
+    image: jyotirmoy43/backend:latest
     ports:
-      - "9090:9090"
+      - "8000:5000"
+    restart: always
+    environment:
+      - DATABASE_URL=mysql://user:password@db:3306/mydb
+    depends_on:
+      - db
+
+  db:
+    image: mysql:8.0
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: examplepassword
+      MYSQL_DATABASE: mydb
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
     volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
-    networks:
-      - monitoring
-    depends_on:
-      - backend
-      - jenkins
-
-  ###############################################
-  # 📊 GRAFANA
-  ###############################################
-  grafana:
-    image: grafana/grafana
-    container_name: grafana
-    restart: always
-    ports:
-      - "3001:3000"
-    environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_USERS_ALLOW_SIGN_UP=false
-    depends_on:
-      - prometheus
-    networks:
-      - monitoring
-
-  ###############################################
-  # 🧱 NODE EXPORTER (SYSTEM METRICS)
-  ###############################################
-  node-exporter:
-    image: prom/node-exporter
-    container_name: node-exporter
-    restart: always
-    ports:
-      - "9100:9100"
-    networks:
-      - monitoring
-
-  ###############################################
-  # 🧰 JENKINS
-  ###############################################
-  jenkins:
-    image: jenkins/jenkins:lts
-    container_name: jenkins
-    restart: always
-    user: root
-    ports:
-      - "8081:8080"
-      - "50000:50000"
-    environment:
-      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false
-    volumes:
-      - jenkins_data:/var/jenkins_home
-      - /var/run/docker.sock:/var/run/docker.sock
-    networks:
-      - monitoring
-
-networks:
-  app_net:
-  monitoring:
+      - db_data:/var/lib/mysql
 
 volumes:
-  jenkins_data:
+  db_data:
+
