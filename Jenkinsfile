@@ -2,10 +2,9 @@ pipeline {
     agent any
 
     environment {
-        REGISTRY          = "your-dockerhub-username"
-        BACKEND_IMAGE     = "${REGISTRY}/fusionpact-backend"
-        FRONTEND_IMAGE    = "${REGISTRY}/fusionpact-frontend"
-        DOCKER_CREDENTIAL = "dockerhub-cred"
+        DOCKER_USER = credentials('dockerhub')   // your DockerHub credentials ID
+        IMAGE_BACKEND = "jyotirmoy43/backend"
+        IMAGE_FRONTEND = "jyotirmoy43/frontend"
     }
 
     stages {
@@ -20,7 +19,7 @@ pipeline {
             steps {
                 echo "⚙️ Building and testing backend in Python container..."
                 sh '''
-                docker run --rm -v $PWD/backend:/app -w /app python:3.11 bash -c "
+                docker run --rm -v $WORKSPACE/backend:/app -w /app python:3.11 bash -c "
                     pip install --no-cache-dir -r requirements.txt &&
                     if [ -f test_main.py ]; then pytest -q || true; else echo 'No backend tests'; fi
                 "
@@ -28,37 +27,34 @@ pipeline {
             }
         }
 
-        stage('Build & Test Frontend') {
+        stage('Build Frontend (Static HTML)') {
             steps {
-                echo "🖥️ Building frontend in Node container..."
+                echo "🖥️ Building frontend Docker image (static HTML)..."
                 sh '''
-                docker run --rm -v $PWD/frontend:/app -w /app node:18 bash -c "
-                    npm ci || npm install &&
-                    npm run build
-                "
+                docker build -t $IMAGE_FRONTEND:latest ./frontend
                 '''
             }
         }
 
-        stage('Build Docker Images') {
+        stage('Build Backend Docker Image') {
             steps {
-                echo "🐳 Building Docker images..."
-                sh """
-                docker build -t ${BACKEND_IMAGE}:${BUILD_NUMBER} ./backend
-                docker build -t ${FRONTEND_IMAGE}:${BUILD_NUMBER} ./frontend
-                """
+                echo "🐳 Building backend Docker image..."
+                sh '''
+                docker build -t $IMAGE_BACKEND:latest ./backend
+                '''
             }
         }
 
         stage('Push Docker Images') {
             steps {
-                echo "📦 Pushing images to Docker Hub..."
-                withCredentials([usernamePassword(credentialsId: DOCKER_CREDENTIAL, usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                    sh """
-                    echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
-                    docker push ${BACKEND_IMAGE}:${BUILD_NUMBER}
-                    docker push ${FRONTEND_IMAGE}:${BUILD_NUMBER}
-                    """
+                echo "🚀 Pushing Docker images to Docker Hub..."
+                withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
+                    sh '''
+                    echo "$PASSWORD" | docker login -u "$USERNAME" --password-stdin
+                    docker push $IMAGE_FRONTEND:latest
+                    docker push $IMAGE_BACKEND:latest
+                    docker logout
+                    '''
                 }
             }
         }
@@ -68,8 +64,8 @@ pipeline {
                 echo "🚀 Deploying application using docker-compose..."
                 sh '''
                 docker-compose down || true
-                docker-compose pull || true
-                docker-compose up -d --build
+                docker-compose up -d
+                docker ps
                 '''
             }
         }
@@ -80,7 +76,11 @@ pipeline {
             echo "🧹 Cleaning workspace and Docker cache..."
             sh 'docker system prune -f || true'
         }
-        success { echo "✅ Pipeline completed successfully." }
-        failure { echo "❌ Pipeline failed." }
+        success {
+            echo "✅ Pipeline completed successfully!"
+        }
+        failure {
+            echo "❌ Pipeline failed."
+        }
     }
 }
